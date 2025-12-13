@@ -1,5 +1,4 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -43,30 +42,22 @@ export default function NewsMap({ articles }) {
         />
 
         <MarkerClusterGroup chunkedLoading>
-          {articles.map((a) => (
-            <Marker
-              key={a.id}
-              position={[a.lat, a.lng]}
-              icon={a.category === "Major Loss" ? lossIcon : maIcon}
-            >
-              <Popup>
-                <strong>{a.title}</strong>
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
-                  {a.category} • {a.source}
-                  <br />
-                  {a.location || ""}
-                  <br />
-                  {a.date ? new Date(a.date).toLocaleDateString("en-GB") : ""}
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <a href={a.link} target="_blank" rel="noreferrer">
-                    Open article
-                  </a>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MarkerClusterGroup>
+       {articles.map((a) => (
+  <Marker
+    key={a.id}
+    position={[a.lat, a.lng]}
+    icon={a.category === "Major Loss" ? lossIcon : maIcon}
+  >
+    <Popup>
+      <strong>{a.title}</strong><br />
+      <em>{a.category}</em><br />
+      <a href={a.link} target="_blank" rel="noreferrer">
+        Read article
+      </a>
+    </Popup>
+  </Marker>
+))}
+
       </MapContainer>
     </div>
   );
