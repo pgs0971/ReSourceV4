@@ -1,130 +1,74 @@
-import { useEffect, useMemo, useState } from "react";
-import NewsMap from "./components/NewsMap.jsx";
-import Filters from "./components/Filters.jsx";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
-function normalizeArticle(a) {
-  return {
-    ...a,
-    lat: typeof a.lat === "string" ? Number(a.lat) : a.lat,
-    lng: typeof a.lng === "string" ? Number(a.lng) : a.lng,
-  };
-}
+// Fix default Leaflet icon paths for Vite/Netlify
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
-export default function App() {
-  const [articles, setArticles] = useState([]);
-  const [loading, setLoading] = useState(false);
+const lossIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  iconSize: [32, 32],
+});
 
-  const [category, setCategory] = useState("ALL");
-  const [source, setSource] = useState("ALL");
-  const [days, setDays] = useState(10);
+const maIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+  iconSize: [32, 32],
+});
 
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/get-news");
-      const data = await res.json();
-      setArticles(Array.isArray(data) ? data.map(normalizeArticle) : []);
-    } catch {
-      setArticles([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+export default function NewsMap({ articles }) {
+  const points = articles
+    .filter(a => Number.isFinite(a.lat) && Number.isFinite(a.lng))
+    .map(a => [a.lat, a.lng]);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const cutoff = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d;
-  }, [days]);
-
-  const filtered = useMemo(() => {
-    return articles.filter((a) => {
-      if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return false;
-      if (a.date && new Date(a.date) < cutoff) return false;
-      if (category !== "ALL" && a.category !== category) return false;
-      if (source !== "ALL" && a.source !== source) return false;
-      return true;
-    });
-  }, [articles, category, source, cutoff]);
-
-  const categories = useMemo(() => {
-    const set = new Set(filtered.map((a) => a.category));
-    return Array.from(set);
-  }, [filtered]);
-
-  const sources = useMemo(() => {
-    const set = new Set(filtered.map((a) => a.source));
-    return Array.from(set);
-  }, [filtered]);
-
-  // Ensure filters never point to missing values
-  useEffect(() => {
-    if (category !== "ALL" && !categories.includes(category)) setCategory("ALL");
-  }, [categories, category]);
-
-  useEffect(() => {
-    if (source !== "ALL" && !sources.includes(source)) setSource("ALL");
-  }, [sources, source]);
+  const bounds = points.length ? points : [[20, 0]];
 
   return (
-    <div className="app">
-      <div className="header">
-        <div className="brand">
-          <h1>Insurance & Reinsurance News Intelligence Map</h1>
-          <p>Mapped Major Losses + M&A from free sources, refreshed on demand.</p>
-        </div>
-      </div>
+    <div className="panel">
+      <MapContainer
+        bounds={bounds}
+        boundsOptions={{ padding: [30, 30] }}
+        style={{ height: "600px", width: "100%" }}
+        scrollWheelZoom
+      >
+        <TileLayer
+          attribution="© OpenStreetMap"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      <Filters
-        category={category}
-        setCategory={setCategory}
-        source={source}
-        setSource={setSource}
-        days={days}
-        setDays={setDays}
-        categories={categories}
-        sources={sources}
-        onRefresh={load}
-        loading={loading}
-        countShown={filtered.length}
-        countTotal={articles.length}
-      />
-
-      <div className="grid">
-        <NewsMap articles={filtered} />
-
-        <div className="panel">
-          <div className="small" style={{ marginBottom: 8, opacity: 0.85 }}>
-            Latest mapped items
-          </div>
-          <div className="list">
-            {filtered.map((a) => (
-              <div className="item" key={a.id}>
-                <div className="meta">
-                  <span>{a.category}</span>
-                  <span>•</span>
-                  <span>{a.source}</span>
-                  <span>•</span>
-                  <span>{a.date ? new Date(a.date).toLocaleDateString("en-GB") : ""}</span>
-                </div>
-                <h3>
-                  <a href={a.link} target="_blank" rel="noreferrer">
-                    {a.title}
-                  </a>
-                </h3>
-                <div className="small">{a.location}</div>
+        {articles.map(a => (
+          <Marker
+            key={a.id}
+            position={[a.lat, a.lng]}
+            icon={a.category === "Major Loss" ? lossIcon : maIcon}
+          >
+            <Popup>
+              <strong>{a.title}</strong>
+              <div style={{ fontSize: 12, marginTop: 6 }}>
+                {a.category} • {a.source}
+                <br />
+                {a.location}
+                <br />
+                {a.date
+                  ? new Date(a.date).toLocaleDateString("en-GB")
+                  : ""}
               </div>
-            ))}
-            {filtered.length === 0 && (
-              <div className="small">No mapped articles match the current filters.</div>
-            )}
-          </div>
-        </div>
-      </div>
+              <div style={{ marginTop: 8 }}>
+                <a href={a.link} target="_blank" rel="noreferrer">
+                  Open article
+                </a>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
     </div>
   );
 }
